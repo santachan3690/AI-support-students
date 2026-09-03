@@ -60,7 +60,7 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
     # 3. Gửi câu hỏi và hiển thị kết quả từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            response = st.session_state.genai_client.models.generate_content(
+            response = client.models.generate_content(
                 model='gemini-1.5-flash',
                 contents=st.session_state.api_contents,
                 config=types.GenerateContentConfig(

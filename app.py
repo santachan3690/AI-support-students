@@ -31,7 +31,7 @@ Thân thiện, tích cực, phù hợp với học sinh THCS, không phán xét.
 
 # Khởi tạo Client
 if "genai_client" not in st.session_state:
-    st.session_state.genai_client = genai.Client(api_key=st.secrets["AQ.Ab8RN6L1u5-jgeYjl0IT2RVuMVKXjmSbZCbVjCfbyvKQ-YJgtw"])
+    st.session_state.genai_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 # Khởi tạo lịch sử hiển thị và ngữ cảnh API
 if "messages" not in st.session_state:

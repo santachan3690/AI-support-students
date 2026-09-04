@@ -55,11 +55,13 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
     })
 
     # 2. Gửi request và xử lý phản hồi từ AI
+ # 2. Gửi request và xử lý phản hồi từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            # Danh sách các model ưu tiên
-            models_to_try = ['gemini-2.0-flash', 'gemini-1.5-flash']
+            # Danh sách các model hỗ trợ chuẩn
+            models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
             response = None
+            last_error = None
             
             for model_name in models_to_try:
                 try:
@@ -71,12 +73,10 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                             temperature=0.3
                         )
                     )
-                    break  # Gọi thành công thì thoát vòng lặp
+                    break  # Thành công -> Thoát vòng lặp ngay
                 except Exception as e:
-                    if "503" in str(e) or "UNAVAILABLE" in str(e):
-                        continue  # Nếu quá tải thì thử model tiếp theo
-                    else:
-                        raise e  # Nếu là lỗi khác thì báo lỗi
+                    last_error = e
+                    continue  # Tự chuyển sang model tiếp theo nếu model hiện tại lỗi
             
             if response:
                 st.markdown(response.text)
@@ -86,4 +86,4 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                     "parts": [{"text": response.text}]
                 })
             else:
-                st.error("Hệ thống đang quá tải, em vui lòng thử lại sau giây lát nhé!")
+                st.error(f"Lỗi kết nối API: {last_error}")

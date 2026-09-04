@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 from google import genai
 from google.genai import types
 
@@ -54,24 +55,36 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
         "parts": [{"text": prompt}]
     })
 
-    # Gọi API AI
+    # Gọi API AI với cơ chế tự động thử lại (Retry Loop)
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            try:
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=st.session_state.api_contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_PROMPT,
-                        temperature=0.3
+            response = None
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model='gemini-3.6-flash',
+                        contents=st.session_state.api_contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            temperature=0.3
+                        )
                     )
-                )
-                
+                    break  # Thành công -> Thoát vòng lặp ngay
+                except Exception as e:
+                    # Nếu Google quá tải (503), chờ 2 giây rồi thử lại tự động
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        if attempt < max_retries - 1:
+                            time.sleep(2)
+                            continue
+                    st.error(f"Lỗi kết nối API: {e}")
+                    break
+            
+            if response:
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 st.session_state.api_contents.append({
                     "role": "model",
                     "parts": [{"text": response.text}]
                 })
-            except Exception as e:
-                st.error(f"Lỗi kết nối API: {e}")

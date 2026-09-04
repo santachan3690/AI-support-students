@@ -3,7 +3,6 @@ import time
 from google import genai
 from google.genai import types
 
-# Cấu hình trang Web
 st.set_page_config(page_title="AI Đồng Hành Tự Chủ", page_icon="🤖")
 st.title("🤖 Trợ Lý AI Đồng Hành Tự Chủ")
 st.caption("Hệ thống hỗ trợ học sinh THCS phát triển năng lực tự học")
@@ -30,45 +29,41 @@ PHONG CÁCH GIAO TIẾP
 Thân thiện, tích cực, phù hợp với học sinh THCS, không phán xét.
 """
 
-# Khởi tạo Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Khởi tạo lịch sử hiển thị và ngữ cảnh API
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "api_contents" not in st.session_state:
     st.session_state.api_contents = []
 
-# Hiển thị lịch sử tin nhắn trên màn hình
+# Hiển thị lịch sử tin nhắn
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Nhập tin nhắn và xử lý phản hồi
 if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em ở đây..."):
-    # 1. Hiển thị và lưu tin nhắn của User
+    # Tạm thời hiển thị tin nhắn người dùng
     st.chat_message("user").markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.session_state.api_contents.append({
+
+    # Tạo ngữ cảnh gửi đi bao gồm tin nhắn mới
+    temp_contents = st.session_state.api_contents + [{
         "role": "user",
         "parts": [{"text": prompt}]
-    })
+    }]
 
-    # 2. Gửi request và xử lý phản hồi từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            # Tên chuẩn các model hỗ trợ trên Google AI Studio
-            models_to_try = ['gemini-2.5-flash', 'gemini-2.5-pro']
+            # Tên model chuẩn tuyệt đối trên API Google
+            models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro']
             response = None
             
             for model_name in models_to_try:
-                # Thử tối đa 2 lần cho mỗi model nếu dính lỗi 503
                 for attempt in range(2):
                     try:
                         response = client.models.generate_content(
                             model=model_name,
-                            contents=st.session_state.api_contents,
+                            contents=temp_contents,
                             config=types.GenerateContentConfig(
                                 system_instruction=SYSTEM_PROMPT,
                                 temperature=0.3
@@ -77,15 +72,21 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                         break
                     except Exception as e:
                         if "503" in str(e) or "UNAVAILABLE" in str(e):
-                            time.sleep(1.5)  # Nghỉ 1.5s trước khi retry
+                            time.sleep(1.5)
                             continue
                         else:
-                            break  # Nếu lỗi khác (như 404/400) thì bỏ qua model này ngay
-                
+                            break
                 if response:
-                    break  # Đã nhận được phản hồi thành công
+                    break
             
             if response:
+                # Chỉ khi gọi thành công mới lưu vào session state chính thức
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                st.session_state.api_contents.append({
+                    "role": "user",
+                    "parts": [{"text": prompt}]
+                })
+                
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 st.session_state.api_contents.append({
@@ -93,4 +94,4 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                     "parts": [{"text": response.text}]
                 })
             else:
-                st.error("Kết nối tới server Google tạm thời gián đoạn. Em vui lòng bấm gửi lại lần nữa nhé!")
+                st.error("Máy chủ Google đang bận, em bấm gửi lại lần nữa nhé!")

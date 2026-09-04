@@ -57,24 +57,33 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
     # 2. Gửi request và xử lý phản hồi từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            try:
-                response = client.models.generate_content(
-                    model='gemini-3.6-flash',
-                    contents=st.session_state.api_contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_PROMPT,
-                        temperature=0.3
+            # Danh sách các model ưu tiên
+            models_to_try = ['gemini-2.0-flash', 'gemini-1.5-flash']
+            response = None
+            
+            for model_name in models_to_try:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=st.session_state.api_contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            temperature=0.3
+                        )
                     )
-                )
-                
-                # Hiển thị kết quả
+                    break  # Gọi thành công thì thoát vòng lặp
+                except Exception as e:
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        continue  # Nếu quá tải thì thử model tiếp theo
+                    else:
+                        raise e  # Nếu là lỗi khác thì báo lỗi
+            
+            if response:
                 st.markdown(response.text)
-                
-                # Lưu phản hồi vào history CHỈ KHI API gọi thành công
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 st.session_state.api_contents.append({
                     "role": "model",
                     "parts": [{"text": response.text}]
                 })
-            except Exception as e:
-                st.error(f"Lỗi kết nối API: {e}")
+            else:
+                st.error("Hệ thống đang quá tải, em vui lòng thử lại sau giây lát nhé!")

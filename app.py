@@ -27,9 +27,12 @@ Thân thiện, tích cực, phù hợp với học sinh THCS, không phán xét.
 # Khởi tạo Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Khởi tạo lịch sử tin nhắn hiển thị
+# Khởi tạo lịch sử hiển thị UI và lịch sử gửi API
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "api_history" not in st.session_state:
+    st.session_state.api_history = []
 
 # Hiển thị lịch sử tin nhắn trên màn hình
 for message in st.session_state.messages:
@@ -46,14 +49,15 @@ uploaded_file = st.file_uploader("Tải ảnh đề bài/bài làm (nếu có):"
 if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em ở đây..."):
     user_msg = {"role": "user", "content": prompt}
     
-    # Danh sách dữ liệu gửi lên cho request hiện tại
-    contents_to_send = [prompt]
+    # Tạo danh sách các phần tử (parts) cho tin nhắn hiện tại
+    current_parts = [types.Part.from_text(text=prompt)]
     
     img = None
     if uploaded_file is not None:
         img = Image.open(uploaded_file)
         user_msg["image"] = img
-        contents_to_send.append(img)
+        # Chuyển ảnh PIL thành Part chuẩn của SDK
+        current_parts.append(img)
 
     # Hiển thị tin nhắn người dùng
     with st.chat_message("user"):
@@ -62,10 +66,15 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
         st.markdown(prompt)
 
     st.session_state.messages.append(user_msg)
+    
+    # Thêm lượt chat người dùng vào lịch sử API chuẩn
+    st.session_state.api_history.append(
+        types.Content(role="user", parts=current_parts)
+    )
 
     # Gọi API AI
     with st.chat_message("assistant"):
-        with st.spinner("AI đang xem hình và suy nghĩ..."):
+        with st.spinner("AI đang suy nghĩ..."):
             response = None
             max_retries = 3
             
@@ -73,7 +82,7 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                 try:
                     response = client.models.generate_content(
                         model='gemini-3.6-flash',
-                        contents=contents_to_send,
+                        contents=st.session_state.api_history,  # Gửi toàn bộ lịch sử hội thoại chuẩn
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_PROMPT,
                             temperature=0.3
@@ -91,3 +100,7 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
             if response:
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
+                # Lưu phản hồi của AI vào lịch sử API
+                st.session_state.api_history.append(
+                    types.Content(role="model", parts=[types.Part.from_text(text=response.text)])
+                )

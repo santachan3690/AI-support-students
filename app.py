@@ -49,15 +49,19 @@ uploaded_file = st.file_uploader("Tải ảnh đề bài/bài làm (nếu có):"
 if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em ở đây..."):
     user_msg = {"role": "user", "content": prompt}
     
-    # Tạo danh sách các phần tử (parts) cho tin nhắn hiện tại
     current_parts = [types.Part.from_text(text=prompt)]
     
     img = None
     if uploaded_file is not None:
         img = Image.open(uploaded_file)
         user_msg["image"] = img
-        # Chuyển ảnh PIL thành Part chuẩn của SDK
-        current_parts.append(img)
+        
+        # Đọc dữ liệu byte của ảnh để truyền vào SDK theo đúng chuẩn
+        image_bytes = uploaded_file.getvalue()
+        mime_type = uploaded_file.type
+        current_parts.append(
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+        )
 
     # Hiển thị tin nhắn người dùng
     with st.chat_message("user"):
@@ -67,7 +71,7 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
 
     st.session_state.messages.append(user_msg)
     
-    # Thêm lượt chat người dùng vào lịch sử API chuẩn
+    # Thêm lượt chat vào lịch sử API
     st.session_state.api_history.append(
         types.Content(role="user", parts=current_parts)
     )
@@ -82,7 +86,7 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                 try:
                     response = client.models.generate_content(
                         model='gemini-3.6-flash',
-                        contents=st.session_state.api_history,  # Gửi toàn bộ lịch sử hội thoại chuẩn
+                        contents=st.session_state.api_history,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_PROMPT,
                             temperature=0.3
@@ -100,7 +104,6 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
             if response:
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
-                # Lưu phản hồi của AI vào lịch sử API
                 st.session_state.api_history.append(
                     types.Content(role="model", parts=[types.Part.from_text(text=response.text)])
                 )

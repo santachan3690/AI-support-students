@@ -2,6 +2,7 @@ import streamlit as st
 import time
 from google import genai
 from google.genai import types
+from PIL import Image
 
 # Cấu hình trang Web
 st.set_page_config(page_title="AI Đồng Hành Tự Chủ", page_icon="🤖")
@@ -14,17 +15,10 @@ Bạn là “AI Đồng hành Tự chủ” – một trợ lý học tập dàn
 
 NGUYÊN TẮC CỐT LÕI
 1. Không làm bài thay học sinh khi học sinh chưa tự suy nghĩ.
-2. Không đưa đáp án trực tiếp ngay khi học sinh vừa đặt câu hỏi.
+2. Không đưa đáp án trực tiếp ngay khi học sinh vừa đặt câu hỏi hoặc gửi ảnh đề bài.
 3. Luôn khuyến khích học sinh trình bày suy nghĩ, cách làm hoặc dự đoán của mình trước.
-4. Ưu tiên đặt câu hỏi gợi mở thay vì cung cấp lời giải.
+4. Ưu tiên đặt câu hỏi gợi mở dựa trên nội dung ảnh/câu hỏi.
 5. Chỉ tăng mức độ hỗ trợ khi học sinh thực sự gặp khó khăn.
-6. Không khiến học sinh hình thành thói quen hỏi AI chỉ để xác nhận một đáp án mà bản thân đã có thể tự kiểm tra.
-7. Sau khi hỗ trợ, khuyến khích học sinh tự giải quyết một nhiệm vụ tương tự mà không dựa vào AI.
-
-QUY TRÌNH HỖ TRỢ
-BƯỚC 1 – XÁC ĐỊNH MỨC ĐỘ TỰ SUY NGHĨ: Hỏi học sinh đã thử làm chưa, nghĩ hướng giải ra sao, vướng ở đâu.
-BƯỚC 2 – ĐÁNH GIÁ MỨC ĐỘ TỰ TIN: Hỏi mức độ tự tin (1-5) và lý do tin rằng đúng.
-BƯỚC 3 – GỢI Ý TỪNG MỨC: Đi từ đặt câu hỏi định hướng -> gợi ý kiến thức -> chỉ ra bước cần xem lại -> giải thích phương pháp -> lời giải chi tiết (chỉ dùng khi đã thử các bước trên).
 
 PHONG CÁCH GIAO TIẾP
 Thân thiện, tích cực, phù hợp với học sinh THCS, không phán xét.
@@ -43,21 +37,42 @@ if "api_contents" not in st.session_state:
 # Hiển thị lịch sử tin nhắn
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        if "image" in message:
+            st.image(message["image"], use_container_width=True)
+        if "content" in message and message["content"]:
+            st.markdown(message["content"])
 
-# Nhập tin nhắn và xử lý phản hồi
+# Nút tải ảnh lên ở thanh bên hoặc giao diện chính
+uploaded_file = st.file_uploader("Tải ảnh đề bài/bài làm (nếu có):", type=["png", "jpg", "jpeg"])
+
+# Nhập tin nhắn và xử lý
 if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em ở đây..."):
-    # Hiển thị và lưu tin nhắn người dùng
-    st.chat_message("user").markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    # Chuẩn bị tin nhắn người dùng
+    user_msg = {"role": "user", "content": prompt}
+    api_parts = [{"text": prompt}]
+    
+    # Mở ảnh nếu học sinh có tải lên
+    img = None
+    if uploaded_file is not None:
+        img = Image.open(uploaded_file)
+        user_msg["image"] = img
+        api_parts.append(img)  # Truyền trực tiếp đối tượng PIL Image vào SDK
+
+    # Hiển thị tin nhắn người dùng
+    with st.chat_message("user"):
+        if img:
+            st.image(img, use_container_width=True)
+        st.markdown(prompt)
+
+    st.session_state.messages.append(user_msg)
     st.session_state.api_contents.append({
         "role": "user",
-        "parts": [{"text": prompt}]
+        "parts": api_parts
     })
 
-    # Gọi API AI với cơ chế tự động thử lại (Retry Loop)
+    # Gọi API AI
     with st.chat_message("assistant"):
-        with st.spinner("AI đang suy nghĩ..."):
+        with st.spinner("AI đang xem hình và suy nghĩ..."):
             response = None
             max_retries = 3
             
@@ -71,9 +86,8 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                             temperature=0.3
                         )
                     )
-                    break  # Thành công -> Thoát vòng lặp ngay
+                    break
                 except Exception as e:
-                    # Nếu Google quá tải (503), chờ 2 giây rồi thử lại tự động
                     if "503" in str(e) or "UNAVAILABLE" in str(e):
                         if attempt < max_retries - 1:
                             time.sleep(2)

@@ -56,31 +56,34 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
     })
 
     # 2. Gửi request và xử lý phản hồi từ AI
-   # 2. Gửi request và xử lý phản hồi từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            # Danh sách model chuẩn tên cho thư viện google-genai
-            models_to_try = [
-                'gemini-3.6-flash',
-                'gemini-1.5-flash-latest',
-                'gemini-1.5-pro-latest'
-            ]
+            # Tên chuẩn các model hỗ trợ trên Google AI Studio
+            models_to_try = ['gemini-2.5-flash', 'gemini-2.5-pro']
             response = None
             
             for model_name in models_to_try:
-                try:
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=st.session_state.api_contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=SYSTEM_PROMPT,
-                            temperature=0.3
+                # Thử tối đa 2 lần cho mỗi model nếu dính lỗi 503
+                for attempt in range(2):
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=st.session_state.api_contents,
+                            config=types.GenerateContentConfig(
+                                system_instruction=SYSTEM_PROMPT,
+                                temperature=0.3
+                            )
                         )
-                    )
-                    break  # Gọi thành công model nào thì dừng lặp ngay
-                except Exception as e:
-                    # Bỏ qua lỗi 503 hoặc 404 để thử model dự phòng tiếp theo
-                    continue
+                        break
+                    except Exception as e:
+                        if "503" in str(e) or "UNAVAILABLE" in str(e):
+                            time.sleep(1.5)  # Nghỉ 1.5s trước khi retry
+                            continue
+                        else:
+                            break  # Nếu lỗi khác (như 404/400) thì bỏ qua model này ngay
+                
+                if response:
+                    break  # Đã nhận được phản hồi thành công
             
             if response:
                 st.markdown(response.text)
@@ -90,4 +93,4 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                     "parts": [{"text": response.text}]
                 })
             else:
-                st.error("Hệ thống Google đang quá tải, em thử bấm gửi lại câu hỏi sau vài giây nhé!")
+                st.error("Kết nối tới server Google tạm thời gián đoạn. Em vui lòng bấm gửi lại lần nữa nhé!")

@@ -46,19 +46,16 @@ for message in st.session_state.messages:
 
 # Nhập tin nhắn và xử lý phản hồi
 if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em ở đây..."):
-    # 1. Hiển thị tin nhắn học sinh
+    # 1. Hiển thị và lưu tin nhắn của User
+    st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # 2. Thêm vào lịch sử gửi tới API
     st.session_state.api_contents.append({
         "role": "user",
         "parts": [{"text": prompt}]
     })
 
-    # 3. Gửi câu hỏi và hiển thị kết quả từ AI
-with st.chat_message("assistant"):
+    # 2. Gửi request và xử lý phản hồi từ AI
+    with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
             try:
                 response = client.models.generate_content(
@@ -69,9 +66,11 @@ with st.chat_message("assistant"):
                         temperature=0.3
                     )
                 )
+                
+                # Hiển thị kết quả
                 st.markdown(response.text)
                 
-                # Lưu lịch sử chat
+                # Lưu phản hồi vào history CHỈ KHI API gọi thành công
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 st.session_state.api_contents.append({
                     "role": "model",
@@ -79,10 +78,3 @@ with st.chat_message("assistant"):
                 })
             except Exception as e:
                 st.error(f"Lỗi kết nối API: {e}")
-            
-            # Lưu phản hồi của AI
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-            st.session_state.api_contents.append({
-                "role": "model",
-                "parts": [{"text": response.text}]
-            })

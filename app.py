@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 from google import genai
 from google.genai import types
 
@@ -33,21 +32,21 @@ Thân thiện, tích cực, phù hợp với học sinh THCS, không phán xét.
 # Khởi tạo Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Khởi tạo lịch sử hiển thị và ngữ cảnh API
+# Khởi tạo lịch sử
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "api_contents" not in st.session_state:
     st.session_state.api_contents = []
 
-# Hiển thị lịch sử tin nhắn trên màn hình
+# Hiển thị lịch sử tin nhắn
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 # Nhập tin nhắn và xử lý phản hồi
 if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em ở đây..."):
-    # 1. Hiển thị và lưu tin nhắn của User
+    # Hiển thị và lưu tin nhắn người dùng
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.api_contents.append({
@@ -55,40 +54,24 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
         "parts": [{"text": prompt}]
     })
 
-    # 2. Gửi request và xử lý phản hồi từ AI
-   # 2. Gửi request và xử lý phản hồi từ AI
+    # Gọi API AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            # Danh sách model chuẩn tên cho thư viện google-genai
-            models_to_try = [
-                'gemini-3.6-flash',
-                'gemini-1.5-flash-latest',
-                'gemini-1.5-pro-latest'
-            ]
-            response = None
-            
-            for model_name in models_to_try:
-                try:
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=st.session_state.api_contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=SYSTEM_PROMPT,
-                            temperature=0.3
-                        )
+            try:
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=st.session_state.api_contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=0.3
                     )
-                    break  # Gọi thành công model nào thì dừng lặp ngay
-                except Exception as e:
-                    # Bỏ qua lỗi 503 hoặc 404 để thử model dự phòng tiếp theo
-                    continue
-            
-            if response:
+                )
+                
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 st.session_state.api_contents.append({
                     "role": "model",
                     "parts": [{"text": response.text}]
                 })
-            else:
-                st.error("Hệ thống Google đang quá tải, em thử bấm gửi lại câu hỏi sau vài giây nhé!")
-
+            except Exception as e:
+                st.error(f"Lỗi kết nối API: {e}")

@@ -56,29 +56,31 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
     })
 
     # 2. Gửi request và xử lý phản hồi từ AI
+   # 2. Gửi request và xử lý phản hồi từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
+            # Danh sách model chuẩn tên cho thư viện google-genai
+            models_to_try = [
+                'gemini-3.6-flash',
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-pro-latest'
+            ]
             response = None
-            max_retries = 3
             
-            for attempt in range(max_retries):
+            for model_name in models_to_try:
                 try:
                     response = client.models.generate_content(
-                        model='gemini-3.6-flash',
+                        model=model_name,
                         contents=st.session_state.api_contents,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_PROMPT,
                             temperature=0.3
                         )
                     )
-                    break  # Thành công -> Thoát vòng lặp
+                    break  # Gọi thành công model nào thì dừng lặp ngay
                 except Exception as e:
-                    if "503" in str(e) or "UNAVAILABLE" in str(e):
-                        if attempt < max_retries - 1:
-                            time.sleep(2)  # Đợi 2 giây rồi thử lại
-                            continue
-                    st.error(f"Lỗi kết nối API: {e}")
-                    break
+                    # Bỏ qua lỗi 503 hoặc 404 để thử model dự phòng tiếp theo
+                    continue
             
             if response:
                 st.markdown(response.text)
@@ -87,3 +89,5 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                     "role": "model",
                     "parts": [{"text": response.text}]
                 })
+            else:
+                st.error("Hệ thống Google đang quá tải, em thử bấm gửi lại câu hỏi sau vài giây nhé!")

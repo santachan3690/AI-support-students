@@ -58,18 +58,27 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
     })
 
     # 3. Gửi câu hỏi và hiển thị kết quả từ AI
-    with st.chat_message("assistant"):
+with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=st.session_state.api_contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    temperature=0.3
+            try:
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash',
+                    contents=st.session_state.api_contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=0.3
+                    )
                 )
-            )
-            
-            st.markdown(response.text)
+                st.markdown(response.text)
+                
+                # Lưu lịch sử chat
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                st.session_state.api_contents.append({
+                    "role": "model",
+                    "parts": [{"text": response.text}]
+                })
+            except Exception as e:
+                st.error(f"Lỗi kết nối API: {e}")
             
             # Lưu phản hồi của AI
             st.session_state.messages.append({"role": "assistant", "content": response.text})

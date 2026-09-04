@@ -56,10 +56,11 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
 
     # 2. Gửi request và xử lý phản hồi từ AI
  # 2. Gửi request và xử lý phản hồi từ AI
+ # 2. Gửi request và xử lý phản hồi từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            # Danh sách các model hỗ trợ chuẩn
-            models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash']
+            # Sử dụng đúng định dạng tên model cho SDK google-genai
+            models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash']
             response = None
             last_error = None
             
@@ -73,10 +74,10 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                             temperature=0.3
                         )
                     )
-                    break  # Thành công -> Thoát vòng lặp ngay
+                    break  # Gọi thành công thì dừng lặp
                 except Exception as e:
                     last_error = e
-                    continue  # Tự chuyển sang model tiếp theo nếu model hiện tại lỗi
+                    continue  # Nếu model bị lỗi/quá tải thì thử model tiếp theo
             
             if response:
                 st.markdown(response.text)

@@ -27,14 +27,11 @@ Thân thiện, tích cực, phù hợp với học sinh THCS, không phán xét.
 # Khởi tạo Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Khởi tạo lịch sử
+# Khởi tạo lịch sử tin nhắn hiển thị
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "api_contents" not in st.session_state:
-    st.session_state.api_contents = []
-
-# Hiển thị lịch sử tin nhắn
+# Hiển thị lịch sử tin nhắn trên màn hình
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         if "image" in message:
@@ -42,21 +39,21 @@ for message in st.session_state.messages:
         if "content" in message and message["content"]:
             st.markdown(message["content"])
 
-# Nút tải ảnh lên ở thanh bên hoặc giao diện chính
+# Khung tải ảnh
 uploaded_file = st.file_uploader("Tải ảnh đề bài/bài làm (nếu có):", type=["png", "jpg", "jpeg"])
 
 # Nhập tin nhắn và xử lý
 if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em ở đây..."):
-    # Chuẩn bị tin nhắn người dùng
     user_msg = {"role": "user", "content": prompt}
-    api_parts = [{"text": prompt}]
     
-    # Mở ảnh nếu học sinh có tải lên
+    # Danh sách dữ liệu gửi lên cho request hiện tại
+    contents_to_send = [prompt]
+    
     img = None
     if uploaded_file is not None:
         img = Image.open(uploaded_file)
         user_msg["image"] = img
-        api_parts.append(img)  # Truyền trực tiếp đối tượng PIL Image vào SDK
+        contents_to_send.append(img)
 
     # Hiển thị tin nhắn người dùng
     with st.chat_message("user"):
@@ -65,10 +62,6 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
         st.markdown(prompt)
 
     st.session_state.messages.append(user_msg)
-    st.session_state.api_contents.append({
-        "role": "user",
-        "parts": api_parts
-    })
 
     # Gọi API AI
     with st.chat_message("assistant"):
@@ -80,7 +73,7 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                 try:
                     response = client.models.generate_content(
                         model='gemini-3.6-flash',
-                        contents=st.session_state.api_contents,
+                        contents=contents_to_send,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_PROMPT,
                             temperature=0.3
@@ -98,7 +91,3 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
             if response:
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
-                st.session_state.api_contents.append({
-                    "role": "model",
-                    "parts": [{"text": response.text}]
-                })

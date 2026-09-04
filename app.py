@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 from google import genai
 from google.genai import types
 
@@ -55,30 +56,29 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
     })
 
     # 2. Gửi request và xử lý phản hồi từ AI
- # 2. Gửi request và xử lý phản hồi từ AI
- # 2. Gửi request và xử lý phản hồi từ AI
-   # 2. Gửi request và xử lý phản hồi từ AI
     with st.chat_message("assistant"):
         with st.spinner("AI đang suy nghĩ..."):
-            # Đổi thành duy nhất 'gemini-3.6-flash'
-            models_to_try = ['gemini-3.6-flash']
             response = None
-            last_error = None
+            max_retries = 3
             
-            for model_name in models_to_try:
+            for attempt in range(max_retries):
                 try:
                     response = client.models.generate_content(
-                        model=model_name,
+                        model='gemini-3.6-flash',
                         contents=st.session_state.api_contents,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_PROMPT,
                             temperature=0.3
                         )
                     )
-                    break  # Gọi thành công thì thoát vòng lặp
+                    break  # Thành công -> Thoát vòng lặp
                 except Exception as e:
-                    last_error = e
-                    continue
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        if attempt < max_retries - 1:
+                            time.sleep(2)  # Đợi 2 giây rồi thử lại
+                            continue
+                    st.error(f"Lỗi kết nối API: {e}")
+                    break
             
             if response:
                 st.markdown(response.text)
@@ -87,5 +87,3 @@ if prompt := st.chat_input("Nhập câu hỏi hoặc câu trả lời của em �
                     "role": "model",
                     "parts": [{"text": response.text}]
                 })
-            else:
-                st.error(f"Lỗi kết nối API: {last_error}")
